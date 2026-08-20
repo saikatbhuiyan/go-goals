@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 
+	authmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/auth"
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/config"
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/postgres"
@@ -46,6 +47,7 @@ func initializeSessionStore() {
 
 func setupRoutes() http.Handler {
 	mux := http.NewServeMux()
+	authHandler := newAuthHandler()
 	fs := http.FileServer(http.Dir(cfg.StaticDir))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := staticPath(r.URL.Path)
@@ -59,8 +61,8 @@ func setupRoutes() http.Handler {
 	mux.HandleFunc("/api/health", healthHandler)
 	mux.HandleFunc("/", homepageHandler)
 	mux.HandleFunc("/browse", browseHandler)
-	mux.HandleFunc("/auth/signin", signinHandler)
-	mux.HandleFunc("/auth/signup", signupHandler)
+	mux.HandleFunc("/auth/signin", authHandler.SignIn)
+	mux.HandleFunc("/auth/signup", authHandler.SignUp)
 	mux.HandleFunc("/auth/logout", logoutHandler)
 	mux.HandleFunc("/profile", authMiddleware(profileHandler))
 	mux.HandleFunc("/profile/edit", authMiddleware(profileEditHandler))
@@ -80,6 +82,12 @@ func setupRoutes() http.Handler {
 	mux.HandleFunc("/privacy", pageHandler("pages/doc_privacy.html"))
 	mux.HandleFunc("/community-guidelines", pageHandler("pages/doc_community_guidelines.html"))
 	return httpx.WithCORS(cfg.WebOrigin, mux)
+}
+
+func newAuthHandler() *authmodule.Handler {
+	authRepository := authmodule.NewPostgresRepository(db)
+	authService := authmodule.NewService(authRepository, authmodule.PasswordHasher{})
+	return authmodule.NewHandler(authService, store, templatePath)
 }
 
 func startServer(handler http.Handler) {
