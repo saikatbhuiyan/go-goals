@@ -24,11 +24,12 @@ var (
 
 // Main and setup
 func main() {
+	appConfig = loadConfig()
 	connectDB()
 	defer db.Close()
 	initializeSessionStore()
-	setupRoutes()
-	startServer()
+	handler := setupRoutes()
+	startServer(handler)
 }
 
 func connectDB() {
@@ -52,52 +53,56 @@ func connectDB() {
 }
 
 func initializeSessionStore() {
-	sessionSecret := os.Getenv("SESSION_SECRET")
-	if sessionSecret == "" {
-		sessionSecret = "development-session-secret"
-	}
-	store = sessions.NewCookieStore([]byte(sessionSecret))
+	store = sessions.NewCookieStore([]byte(appConfig.SessionSecret))
 }
 
-func setupRoutes() {
-	fs := http.FileServer(http.Dir("static"))
-	http.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := filepath.Join("static", r.URL.Path)
+func setupRoutes() http.Handler {
+	mux := http.NewServeMux()
+	fs := http.FileServer(http.Dir(appConfig.StaticDir))
+	mux.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := staticPath(r.URL.Path)
 		contentType := mime.TypeByExtension(filepath.Ext(path))
 		if contentType != "" {
 			w.Header().Set("Content-Type", contentType)
 		}
 		fs.ServeHTTP(w, r)
 	})))
-	http.HandleFunc("/", homepageHandler)
-	http.HandleFunc("/browse", browseHandler)
-	http.HandleFunc("/auth/signin", signinHandler)
-	http.HandleFunc("/auth/signup", signupHandler)
-	http.HandleFunc("/auth/logout", logoutHandler)
-	http.HandleFunc("/profile", authMiddleware(profileHandler))
-	http.HandleFunc("/profile/edit", authMiddleware(profileEditHandler))
-	http.HandleFunc("/users/", publicProfileHandler)
-	http.HandleFunc("/aspiration-update", authMiddleware(aspirationUpdateHandler))
-	http.HandleFunc("/aspiration-update/edit/", authMiddleware(editAspirationUpdateHandler))
-	http.HandleFunc("/aspiration-update/delete/", authMiddleware(deleteAspirationUpdateHandler))
-	http.HandleFunc("/like", authMiddleware(likeHandler))
-	http.HandleFunc("/unlike", authMiddleware(unlikeHandler))
-	http.HandleFunc("/follow", authMiddleware(followHandler))
-	http.HandleFunc("/unfollow", authMiddleware(unfollowHandler))
-	http.HandleFunc("/update/", updatePermalinkHandler)
-	http.HandleFunc("/comment/add", authMiddleware(addCommentHandler))
-	// admin handlers
-	http.HandleFunc("/admin/ban-user", adminAuthMiddleware(banUserHandler))
-	http.HandleFunc("/admin/unban-user", adminAuthMiddleware(unbanUserHandler))
-	// pages
-	http.HandleFunc("/terms", pageHandler("pages/doc_terms.html"))
-	http.HandleFunc("/privacy", pageHandler("pages/doc_privacy.html"))
-	http.HandleFunc("/community-guidelines", pageHandler("pages/doc_community_guidelines.html"))
+	mux.HandleFunc("/healthz", healthHandler)
+	mux.HandleFunc("/api/health", healthHandler)
+	mux.HandleFunc("/", homepageHandler)
+	mux.HandleFunc("/browse", browseHandler)
+	mux.HandleFunc("/auth/signin", signinHandler)
+	mux.HandleFunc("/auth/signup", signupHandler)
+	mux.HandleFunc("/auth/logout", logoutHandler)
+	mux.HandleFunc("/profile", authMiddleware(profileHandler))
+	mux.HandleFunc("/profile/edit", authMiddleware(profileEditHandler))
+	mux.HandleFunc("/users/", publicProfileHandler)
+	mux.HandleFunc("/aspiration-update", authMiddleware(aspirationUpdateHandler))
+	mux.HandleFunc("/aspiration-update/edit/", authMiddleware(editAspirationUpdateHandler))
+	mux.HandleFunc("/aspiration-update/delete/", authMiddleware(deleteAspirationUpdateHandler))
+	mux.HandleFunc("/like", authMiddleware(likeHandler))
+	mux.HandleFunc("/unlike", authMiddleware(unlikeHandler))
+	mux.HandleFunc("/follow", authMiddleware(followHandler))
+	mux.HandleFunc("/unfollow", authMiddleware(unfollowHandler))
+	mux.HandleFunc("/update/", updatePermalinkHandler)
+	mux.HandleFunc("/comment/add", authMiddleware(addCommentHandler))
+	mux.HandleFunc("/admin/ban-user", adminAuthMiddleware(banUserHandler))
+	mux.HandleFunc("/admin/unban-user", adminAuthMiddleware(unbanUserHandler))
+	mux.HandleFunc("/terms", pageHandler("pages/doc_terms.html"))
+	mux.HandleFunc("/privacy", pageHandler("pages/doc_privacy.html"))
+	mux.HandleFunc("/community-guidelines", pageHandler("pages/doc_community_guidelines.html"))
+	return withCORS(mux)
 }
 
-func startServer() {
-	log.Println("Server starting on http://localhost:8080")
-	log.Fatal(http.ListenAndServe(":8080", nil))
+func startServer(handler http.Handler) {
+	log.Printf("Server starting on %s", appConfig.HTTPAddr)
+	log.Fatal(http.ListenAndServe(appConfig.HTTPAddr, handler))
+}
+
+func healthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write([]byte(`{"status":"ok"}`))
 }
 
 func authMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -261,7 +266,7 @@ func fetchRecentUpdates(currentUserID int, limit int) ([]AspirationUpdate, error
 }
 
 func renderProfileEditPage(w http.ResponseWriter, user User, errorMessage string) {
-	tmpl, err := template.ParseFiles("templates/profile_edit.html")
+	tmpl, err := template.ParseFiles(templatePath("profile_edit.html"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -284,7 +289,7 @@ func renderProfileEditPage(w http.ResponseWriter, user User, errorMessage string
 // Generic page handler
 func pageHandler(templateName string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		tmpl, err := template.ParseFiles("templates/" + templateName)
+		tmpl, err := template.ParseFiles(templatePath(templateName))
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -310,7 +315,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 
 // Handlers
 func homepageHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("templates/homepage.html")
+	tmpl, err := template.ParseFiles(templatePath("homepage.html"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -364,7 +369,7 @@ func homepageHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func browseHandler(w http.ResponseWriter, r *http.Request) {
-	tmpl, err := template.ParseFiles("templates/browse.html")
+	tmpl, err := template.ParseFiles(templatePath("browse.html"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -598,7 +603,7 @@ func profileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("templates/profile.html")
+	tmpl, err := template.ParseFiles(templatePath("profile.html"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -716,7 +721,7 @@ func publicProfileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("templates/public_profile.html")
+	tmpl, err := template.ParseFiles(templatePath("public_profile.html"))
 	if err != nil {
 		log.Printf("Template parsing error: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -886,7 +891,7 @@ func editAspirationUpdateHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles("templates/edit_aspiration_update.html")
+	tmpl, err := template.ParseFiles(templatePath("edit_aspiration_update.html"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -1182,7 +1187,7 @@ func updatePermalinkHandler(w http.ResponseWriter, r *http.Request) {
 		},
 	}
 
-	tmpl, err := template.New("aspiration_update.html").Funcs(funcMap).ParseFiles("templates/aspiration_update.html")
+	tmpl, err := template.New("aspiration_update.html").Funcs(funcMap).ParseFiles(templatePath("aspiration_update.html"))
 	if err != nil {
 		log.Printf("Error parsing template: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)

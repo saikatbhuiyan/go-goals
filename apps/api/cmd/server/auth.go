@@ -149,7 +149,7 @@ func signupHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func renderAuthPage(w http.ResponseWriter, templateName string, data authPageData) {
-	tmpl, err := template.ParseFiles("templates/" + templateName)
+	tmpl, err := template.ParseFiles(templatePath(templateName))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
