@@ -8,11 +8,14 @@ import (
 	"log"
 	"mime"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 
+	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/config"
+	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
+	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/postgres"
+	apisessions "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/sessions"
 	"github.com/gorilla/sessions"
 	_ "github.com/lib/pq"
 )
@@ -20,11 +23,12 @@ import (
 var (
 	db    *sql.DB
 	store *sessions.CookieStore
+	cfg   config.Config
 )
 
 // Main and setup
 func main() {
-	appConfig = loadConfig()
+	cfg = config.Load()
 	connectDB()
 	defer db.Close()
 	initializeSessionStore()
@@ -33,32 +37,16 @@ func main() {
 }
 
 func connectDB() {
-	postgresUrl := os.Getenv("POSTGRES_URL")
-	if postgresUrl == "" {
-		log.Fatal("POSTGRES_URL environment variable must be set")
-	}
-
-	var err error
-	db, err = sql.Open("postgres", postgresUrl)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	err = db.Ping()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	log.Println("Successfully connected to the database")
+	db = postgres.ConnectFromEnv()
 }
 
 func initializeSessionStore() {
-	store = sessions.NewCookieStore([]byte(appConfig.SessionSecret))
+	store = apisessions.NewCookieStore(cfg.SessionSecret)
 }
 
 func setupRoutes() http.Handler {
 	mux := http.NewServeMux()
-	fs := http.FileServer(http.Dir(appConfig.StaticDir))
+	fs := http.FileServer(http.Dir(cfg.StaticDir))
 	mux.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		path := staticPath(r.URL.Path)
 		contentType := mime.TypeByExtension(filepath.Ext(path))
@@ -91,12 +79,12 @@ func setupRoutes() http.Handler {
 	mux.HandleFunc("/terms", pageHandler("pages/doc_terms.html"))
 	mux.HandleFunc("/privacy", pageHandler("pages/doc_privacy.html"))
 	mux.HandleFunc("/community-guidelines", pageHandler("pages/doc_community_guidelines.html"))
-	return withCORS(mux)
+	return httpx.WithCORS(cfg.WebOrigin, mux)
 }
 
 func startServer(handler http.Handler) {
-	log.Printf("Server starting on %s", appConfig.HTTPAddr)
-	log.Fatal(http.ListenAndServe(appConfig.HTTPAddr, handler))
+	log.Printf("Server starting on %s", cfg.HTTPAddr)
+	log.Fatal(http.ListenAndServe(cfg.HTTPAddr, handler))
 }
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
