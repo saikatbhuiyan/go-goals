@@ -17,7 +17,8 @@
                     <a href="/profile">My Profile</a>
                     <a href="/auth/logout">Logout</a>
                 {{else}}
-                    <a href="/auth/google/login">Login</a>
+                    <a href="/auth/signin">Sign In</a>
+                    <a href="/auth/signup" class="auth-link-button">Sign Up</a>
                 {{end}}
             </div>
         </nav>
@@ -71,7 +72,7 @@
                     <button type="submit">Add Comment</button>
                 </form>
             {{else}}
-                <p>Please <a href="/auth/google/login">login</a> to add a comment.</p>
+                <p>Please <a href="/auth/signin">sign in</a> to add a comment.</p>
             {{end}}
 
             <ul class="comments-list" id="comments">

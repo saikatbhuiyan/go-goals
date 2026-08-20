@@ -1,13 +1,10 @@
-[![Frontend Masters](https://static.frontendmasters.com/assets/brand/logos/full.png)](https://frontendmasters.com/courses/fullstack-deployment)
-This is a companion repository for the [Modern Deployment](https://frontendmasters.com/courses/fullstack-deployment) course on Frontend Masters. The repository contains an example Go application that will be deployed to AWS.
-
-## goals Application
+Goals Application
 
 This application is a social media platform for setting and sharing life goals and aspirations.
 
 ### Features
 
-- User authentication with Google OAuth2
+- User authentication with regular email/password signup and signin
 - Create and edit personal profiles (username, display name, bio, bio link, life aspirations, things I like to do)
 - Share aspiration updates (create, edit, and delete)
 - Leave nested comments on aspiration updates
@@ -21,25 +18,11 @@ This application is a social media platform for setting and sharing life goals a
 - Go 1.24.2 or later
 - Docker and Docker Compose
 - PostgreSQL (if not using Docker)
-- Google Cloud Console account for OAuth2 setup
 
 ### Docker Setup
 
 1. Ensure Docker and Docker Compose are installed
 2. Run `docker-compose up --detach` to start both the PostgreSQL database
-
-### Google OAuth2 Setup
-
-1. Go to the Google Cloud Console: https://console.cloud.google.com/
-2. Create a new project or select an existing one
-3. Navigate to "APIs & Services" > "Credentials"
-4. Click on "Create Credentials" and select "OAuth client ID"
-5. Set up the OAuth consent screen if prompted
-6. Choose "Web application" as the application type
-7. Set the name for your OAuth 2.0 client
-8. Add http://localhost:8080/auth/google/callback to "Authorized redirect URIs"
-9. Click "Create" and note down the Client ID and Client Secret
-10. Keep note of credentials to use in `.env` file later
 
 ### Database Setup
 
@@ -51,6 +34,7 @@ docker compose exec postgres psql -U postgres -d postgres
 CREATE TABLE users (
     id SERIAL PRIMARY KEY,
     email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
     bio TEXT,
     bio_link VARCHAR(255),
     username VARCHAR(50) UNIQUE NOT NULL,
@@ -101,6 +85,8 @@ CREATE TABLE comments (
 );
 ```
 
+For an existing database, apply `migrations/001_add_password_hash_to_users.sql` before using regular signup/signin.
+
 Then once you login to the app, add yourself as admin
 
 ```sql
@@ -113,11 +99,10 @@ WHERE email = 'user@example.com';
 ### Development Environment
 
 1. Copy `.env.example` to create new `.env` file
-2. Update `.env` file with OAuth credentials
+2. Update `.env` file with your PostgreSQL URL and a long random `SESSION_SECRET`
 3. Source `.env` with `source .env`
-4. Start server with `go run main.go`
+4. Start server with `go run .`
 5. Navigate to http://localhost:8080
-
 
 ## Course Resources
 
@@ -128,23 +113,19 @@ The resources and code snippets below are reference throughout the [Fullstack De
 To follow along with the course, you will need:
 
 1. Go version 1.24.2 or later
-    - [Download and install Go](https://go.dev/doc/install)
-1. Docker Desktop
-    - [Download and install Docker Desktop](https://www.docker.com/products/docker-desktop/)
-    - **Important:** Check "Enable host networking" under `Settings > Resources > Network`
-1. Google Cloud Console
-    - Log into the [Google Cloud Console](https://console.cloud.google.com/auth/clients)
-    - You'll create an OAuth Client during the course
-1. AWS
-    - Create an AWS Root User account and log into the [AWS Console](https://us-east-1.console.aws.amazon.com/console/home)
-    - Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
-    - In the course, you'll create an Administrator User in IAM for the CLI and [set environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html) in your console to authenticate the CLI
-1. Terraform
-    - Install the [Terraform CLI](https://developer.hashicorp.com/terraform/install)
-1. Supabase
-    - Create a [Supabase account]()
-1.
-
+   - [Download and install Go](https://go.dev/doc/install)
+2. Docker Desktop
+   - [Download and install Docker Desktop](https://www.docker.com/products/docker-desktop/)
+   - **Important:** Check "Enable host networking" under `Settings > Resources > Network`
+3. AWS
+   - Create an AWS Root User account and log into the [AWS Console](https://us-east-1.console.aws.amazon.com/console/home)
+   - Install the [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+   - In the course, you'll create an Administrator User in IAM for the CLI and [set environment variables](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-envvars.html) in your console to authenticate the CLI
+4. Terraform
+   - Install the [Terraform CLI](https://developer.hashicorp.com/terraform/install)
+5. Supabase
+   - Create a [Supabase account]()
+6. 
 
 ### App Runner IAM Policy
 
@@ -194,12 +175,12 @@ Then verify the installation by running `goose -version`
 
 **Note:** If you see a `command not found: goose` error when trying to run goose, it's because the `$HOME/go/bin` directory is not added to your PATH. You can fix this temporarily by running export `PATH=$HOME/go/bin:$PATH`, but this will not persist if you close your terminal. A permanent fix would require adding export `PATH=$HOME/go/bin:$PATH` to your .zshrc or .bashrc.
 
-
 ### Deploying the Service
 
 When you are deploying the fm-fd-service with Terraform, Erik covers some troubleshooting tips throughout the lesson. Here are some additional troubleshooting tips:
 
 **Clean up your local docker images and push up a fresh image to ECR**
+
 ```bash
 # You first may need to log (Go to ECR > Click on your image > View Push Command)
 # aws ecr get-login-password......
@@ -232,10 +213,10 @@ terraform apply "terraform.tfplan"
 Once you complete the course, you'll need to remove all the AWS resources to avoid changes:
 
 1. Run `terraform destroy` to remove all resources created by Terraform
-1. Navigate to [AWS App Runner](https://us-west-2.console.aws.amazon.com/apprunner/home?region=us-west-2), click on your App Runner instance and choose `Actions > Delete`
-1. Navigate to [AWS Parameter Store](https://us-west-2.console.aws.amazon.com/systems-manager/parameters/?region=us-west-2) and delete the `fm-fd-service` parameters (the others should have been removed by running `terraform destroy`)
-1. Navigate [to ECR](https://us-west-2.console.aws.amazon.com/ecr/private-registry/repositories?region=us-west-2) and delete your container
-1. Delete your [Supabase database](https://supabase.com/dashboard/)
+2. Navigate to [AWS App Runner](https://us-west-2.console.aws.amazon.com/apprunner/home?region=us-west-2), click on your App Runner instance and choose `Actions > Delete`
+3. Navigate to [AWS Parameter Store](https://us-west-2.console.aws.amazon.com/systems-manager/parameters/?region=us-west-2) and delete the `fm-fd-service` parameters (the others should have been removed by running `terraform destroy`)
+4. Navigate [to ECR](https://us-west-2.console.aws.amazon.com/ecr/private-registry/repositories?region=us-west-2) and delete your container
+5. Delete your [Supabase database](https://supabase.com/dashboard/)
 
 > You can monitor your AWS changes in the [Cost Explorer](https://us-east-1.console.aws.amazon.com/costmanagement/home?region=us-west-2#/home)
 

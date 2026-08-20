@@ -37,6 +37,12 @@ header {
         text-decoration: none;
         margin-left: 1rem;
     }
+
+    .auth-buttons .auth-link-button {
+        border: 1px solid rgba(255, 255, 255, 0.8);
+        border-radius: 4px;
+        padding: 0.4rem 0.7rem;
+    }
 }
 
 main {
@@ -74,6 +80,8 @@ form {
 }
 
 input[type="text"],
+input[type="email"],
+input[type="password"],
 input[type="url"],
 textarea {
     width: 100%;
@@ -101,6 +109,33 @@ button,
 .error-message {
     color: #dc3545;
     margin-bottom: 1rem;
+}
+
+.auth-main {
+    max-width: 440px;
+}
+
+.auth-card {
+    margin: 0;
+}
+
+.auth-form {
+    margin-bottom: 1rem;
+}
+
+.auth-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.auth-form label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 0.35rem;
+}
+
+.auth-switch {
+    margin: 0;
+    text-align: center;
 }
 
 .content-box,
@@ -227,26 +262,6 @@ button,
     &:hover {
         background-color: #0056b3;
         text-decoration: none;
-    }
-
-    &.google-signin-button {
-        font-size: 16px;
-        padding: 12px 24px;
-        background-color: #4285F4;
-        color: white;
-        border: none;
-
-        &:hover {
-            background-color: #357ae8;
-        }
-
-        .google-icon {
-            margin-right: 12px;
-        }
-
-        span {
-            color: white;
-        }
     }
 }
 
@@ -547,35 +562,6 @@ button,
 
     .reply-item {
         margin-bottom: 0.5rem;
-    }
-}
-
-.google-signin-button {
-    display: inline-flex;
-    align-items: center;
-    background-color: #fff;
-    color: #757575;
-    border: 1px solid #dadce0;
-    border-radius: 4px;
-    font-family: Arial, sans-serif;
-    font-size: 14px;
-    font-weight: bold;
-    padding: 10px 12px;
-    text-decoration: none;
-    transition: background-color 0.3s, box-shadow 0.3s;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-
-    &:hover {
-        background-color: #f7f8f8;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.16), 0 2px 4px rgba(0,0,0,0.23);
-    }
-
-    .google-icon {
-        margin-right: 8px;
-    }
-
-    span {
-        color: #757575;
     }
 }
 

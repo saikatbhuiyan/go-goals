@@ -3,147 +3,32 @@ package main
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"html/template"
-	"io"
 	"log"
-	"math/rand"
 	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gorilla/sessions"
 	_ "github.com/lib/pq"
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
 )
 
 var (
-	db           *sql.DB
-	store        *sessions.CookieStore
-	oauth2Config *oauth2.Config
+	db    *sql.DB
+	store *sessions.CookieStore
 )
-
-// Custom types
-type contextKey string
-
-const emailKey contextKey = "email"
-
-type NotFoundError struct {
-	Resource string
-}
-
-func (e *NotFoundError) Error() string {
-	return fmt.Sprintf("%s not found", e.Resource)
-}
-
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("Validation error for %s: %s", e.Field, e.Message)
-}
-
-type DatabaseError struct {
-	Operation string
-	Err       error
-}
-
-func (e *DatabaseError) Error() string {
-	return fmt.Sprintf("Database error during %s: %v", e.Operation, e.Err)
-}
-
-// Models
-type User struct {
-	ID              int
-	Email           string
-	Username        string
-	DisplayName     string
-	LifeAspirations sql.NullString
-	ThingsILikeToDo sql.NullString
-	ProfileImageURL sql.NullString
-	Bio             sql.NullString
-	BioLink         sql.NullString
-	IsBanned        bool
-}
-
-type AspirationUpdate struct {
-	ID              int
-	Username        string
-	DisplayName     string
-	Content         string
-	CreatedAt       time.Time
-	LikeCount       int
-	CommentCount    int
-	Liked           bool
-	IsOwnPost       bool
-	ProfileImageURL sql.NullString
-}
-
-type Comment struct {
-	ID              int
-	UpdateID        int
-	UserID          int
-	ParentID        sql.NullInt64
-	Content         string
-	CreatedAt       time.Time
-	Username        string
-	DisplayName     string
-	ProfileImageURL string
-	Replies         []*Comment
-}
-
-type CommentContext struct {
-	Root            interface{}
-	Comment         *Comment
-	UpdateID        int
-	IsAuthenticated bool
-}
-
-type Administrator struct {
-	ID       int
-	Email    string
-	Username string
-}
 
 // Main and setup
 func main() {
-	loadConfig()
 	connectDB()
 	defer db.Close()
-	initializeOAuth()
 	initializeSessionStore()
 	setupRoutes()
 	startServer()
-}
-
-func loadConfig() {
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
-	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
-	googleRedirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
-
-	if googleClientID == "" || googleClientSecret == "" || googleRedirectURL == "" {
-		log.Fatal("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URL environment variables must be set")
-	}
-
-	// Initialize oauth2Config here
-	oauth2Config = &oauth2.Config{
-		ClientID:     googleClientID,
-		ClientSecret: googleClientSecret,
-		RedirectURL:  googleRedirectURL,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
 }
 
 func connectDB() {
@@ -166,29 +51,12 @@ func connectDB() {
 	log.Println("Successfully connected to the database")
 }
 
-func initializeOAuth() {
-	googleClientID := os.Getenv("GOOGLE_CLIENT_ID")
-	googleClientSecret := os.Getenv("GOOGLE_CLIENT_SECRET")
-	googleRedirectURL := os.Getenv("GOOGLE_REDIRECT_URL")
-
-	if googleClientID == "" || googleClientSecret == "" || googleRedirectURL == "" {
-		log.Fatal("GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, and GOOGLE_REDIRECT_URL environment variables must be set")
-	}
-
-	oauth2Config = &oauth2.Config{
-		ClientID:     googleClientID,
-		ClientSecret: googleClientSecret,
-		RedirectURL:  googleRedirectURL,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/userinfo.email",
-			"https://www.googleapis.com/auth/userinfo.profile",
-		},
-		Endpoint: google.Endpoint,
-	}
-}
-
 func initializeSessionStore() {
-	store = sessions.NewCookieStore([]byte("your-secret-key"))
+	sessionSecret := os.Getenv("SESSION_SECRET")
+	if sessionSecret == "" {
+		sessionSecret = "development-session-secret"
+	}
+	store = sessions.NewCookieStore([]byte(sessionSecret))
 }
 
 func setupRoutes() {
@@ -203,8 +71,8 @@ func setupRoutes() {
 	})))
 	http.HandleFunc("/", homepageHandler)
 	http.HandleFunc("/browse", browseHandler)
-	http.HandleFunc("/auth/google/login", googleLoginHandler)
-	http.HandleFunc("/auth/google/callback", googleCallbackHandler)
+	http.HandleFunc("/auth/signin", signinHandler)
+	http.HandleFunc("/auth/signup", signupHandler)
 	http.HandleFunc("/auth/logout", logoutHandler)
 	http.HandleFunc("/profile", authMiddleware(profileHandler))
 	http.HandleFunc("/profile/edit", authMiddleware(profileEditHandler))
@@ -426,95 +294,6 @@ func pageHandler(templateName string) http.HandlerFunc {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
 	}
-}
-
-// OAuth handlers
-func googleLoginHandler(w http.ResponseWriter, r *http.Request) {
-	url := oauth2Config.AuthCodeURL("state", oauth2.AccessTypeOffline)
-	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
-}
-
-func googleCallbackHandler(w http.ResponseWriter, r *http.Request) {
-	// Get the session
-	session, _ := store.Get(r, "session-name")
-
-	code := r.URL.Query().Get("code")
-	token, err := oauth2Config.Exchange(r.Context(), code)
-	if err != nil {
-		http.Error(w, "Failed to exchange token: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	client := oauth2Config.Client(r.Context(), token)
-	resp, err := client.Get("https://www.googleapis.com/oauth2/v2/userinfo")
-	if err != nil {
-		http.Error(w, "Failed to get user info: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer resp.Body.Close()
-
-	userData, err := io.ReadAll(resp.Body)
-	if err != nil {
-		http.Error(w, "Failed to read response body: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	var userInfo map[string]interface{}
-	if err := json.Unmarshal(userData, &userInfo); err != nil {
-		http.Error(w, "Failed to parse user info: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	email := userInfo["email"].(string)
-	profileImageURL := userInfo["picture"].(string)
-
-	// Check if the user exists in the database
-	var userID int
-	var username string
-	err = db.QueryRow("SELECT id, username FROM users WHERE email = $1", email).Scan(&userID, &username)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			// User doesn't exist, create a new user with a random username
-			randomUsername := generateRandomUsername()
-			_, err = db.Exec("INSERT INTO users (email, profile_image_url, username) VALUES ($1, $2, $3)", email, profileImageURL, randomUsername)
-			if err != nil {
-				http.Error(w, "Failed to create user: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			// Set session values
-			session.Values["email"] = email
-			session.Values["newUser"] = true
-			err = session.Save(r, w)
-			if err != nil {
-				http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
-				return
-			}
-
-			// Redirect to profile edit page
-			http.Redirect(w, r, "/profile/edit", http.StatusFound)
-			return
-		} else {
-			http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-	}
-
-	// User exists, update the profile image URL
-	_, err = db.Exec("UPDATE users SET profile_image_url = $1 WHERE email = $2", profileImageURL, email)
-	if err != nil {
-		http.Error(w, "Failed to update profile image: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	// Set session values and redirect to profile page
-	session.Values["email"] = email
-	err = session.Save(r, w)
-	if err != nil {
-		http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
-		return
-	}
-	http.Redirect(w, r, "/profile", http.StatusFound)
 }
 
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -1521,15 +1300,4 @@ func countTotalComments(comments []*Comment) int {
 		total += countTotalComments(comment.Replies)
 	}
 	return total
-}
-
-func generateRandomUsername() string {
-	const charset = "abcdefghijklmnopqrstuvwxyz0123456789"
-	const usernameLength = 8
-
-	b := make([]byte, usernameLength)
-	for i := range b {
-		b[i] = charset[rand.Intn(len(charset))]
-	}
-	return "user_" + string(b)
 }
