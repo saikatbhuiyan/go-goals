@@ -16,8 +16,20 @@ This application is a social media platform for setting and sharing life goals a
 ### Prerequisites for Running the Application
 
 - Go 1.24.2 or later
+- Node.js 20.9 or later
+- npm
 - Docker and Docker Compose
 - PostgreSQL (if not using Docker)
+
+### Repository Layout
+
+```text
+apps/api   Go application/API tier
+apps/web   Next.js UI tier
+migrations PostgreSQL schema changes
+templates  Legacy Go-rendered pages during the UI migration
+static     Legacy Go-rendered assets during the UI migration
+```
 
 ### Docker Setup
 
@@ -100,9 +112,22 @@ WHERE email = 'user@example.com';
 
 1. Copy `.env.example` to create new `.env` file
 2. Update `.env` file with your PostgreSQL URL and a long random `SESSION_SECRET`
-3. Source `.env` with `source .env`
-4. Start server with `go run .`
-5. Navigate to http://localhost:8080
+3. Copy `apps/web/.env.example` to `apps/web/.env.local`
+4. Source the API env with `source .env`
+5. Start the Go API with `make dev-api`
+6. In a second terminal, start the Next.js UI with `make dev-web`
+7. Navigate to http://localhost:3000
+
+The Go tier still serves legacy pages at http://localhost:8080 while the Next.js
+tier is introduced. The Next.js UI uses `API_BASE_URL` to talk to the Go tier.
+
+### Verification
+
+```bash
+make test-api
+make lint-web
+make build-web
+```
 
 ## Course Resources
 
