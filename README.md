@@ -40,65 +40,8 @@ static     Legacy Go-rendered assets during the UI migration
 ### Database Setup
 
 ```bash
-docker compose exec postgres psql -U postgres -d postgres
+make migrate-up
 ```
-
-```sql
-CREATE TABLE users (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    bio TEXT,
-    bio_link VARCHAR(255),
-    username VARCHAR(50) UNIQUE NOT NULL,
-    display_name VARCHAR(100),
-    profile_image_url TEXT,
-    life_aspirations TEXT,
-    things_i_like_to_do TEXT,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    is_logged_in BOOLEAN DEFAULT FALSE,
-    is_banned BOOLEAN DEFAULT FALSE
-);
-
-CREATE TABLE administrators (
-    id SERIAL PRIMARY KEY,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    username VARCHAR(255) UNIQUE NOT NULL
-);
-
-CREATE TABLE aspiration_updates (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
-    content TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-
-CREATE TABLE likes (
-    id SERIAL PRIMARY KEY,
-    user_id INTEGER REFERENCES users(id),
-    update_id INTEGER REFERENCES aspiration_updates(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (user_id, update_id)
-);
-
-CREATE TABLE followers (
-    follower_id INTEGER REFERENCES users(id),
-    followed_id INTEGER REFERENCES users(id),
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (follower_id, followed_id)
-);
-
-CREATE TABLE comments (
-    id SERIAL PRIMARY KEY,
-    update_id INTEGER REFERENCES aspiration_updates(id),
-    user_id INTEGER REFERENCES users(id),
-    parent_id INTEGER REFERENCES comments(id),
-    content TEXT NOT NULL,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
-);
-```
-
-For an existing database, apply `migrations/001_add_password_hash_to_users.sql` before using regular signup/signin.
 
 Then once you login to the app, add yourself as admin
 
@@ -190,13 +133,25 @@ In the **App Runner IAM Role** lesson, copy and paste this JSON code when you ar
 
 ### Adding Database Migration
 
-The application uses [goose for database migrations](https://github.com/pressly/goose). Install goose:
+The application uses [goose for database migrations](https://github.com/pressly/goose). The Makefile runs goose through `go run` by default, so no global install is required. To install the binary locally:
 
 ```bash
-go install github.com/pressly/goose/v3/cmd/goose@latest
+make goose-install
 ```
 
-Then verify the installation by running `goose -version`
+Then verify the installation by running `goose -version`.
+
+Migration commands:
+
+```bash
+make migrate-up
+make migrate-down
+make migrate-redo
+make migrate-reset
+make migrate-status
+make migrate-version
+make migrate-create MIGRATION_NAME=add_new_table
+```
 
 **Note:** If you see a `command not found: goose` error when trying to run goose, it's because the `$HOME/go/bin` directory is not added to your PATH. You can fix this temporarily by running export `PATH=$HOME/go/bin:$PATH`, but this will not persist if you close your terminal. A permanent fix would require adding export `PATH=$HOME/go/bin:$PATH` to your .zshrc or .bashrc.
 
