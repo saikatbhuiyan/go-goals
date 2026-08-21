@@ -34,7 +34,8 @@ static     Legacy Go-rendered assets during the UI migration
 ### Docker Setup
 
 1. Ensure Docker and Docker Compose are installed
-2. Run `docker-compose up --detach` to start both the PostgreSQL database
+2. Run `docker compose up --detach` to start the PostgreSQL database
+3. The local database is exposed on `localhost:5434` to avoid colliding with other PostgreSQL instances.
 
 ### Database Setup
 
