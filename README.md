@@ -113,10 +113,9 @@ WHERE email = 'user@example.com';
 1. Copy `.env.example` to create new `.env` file
 2. Update `.env` file with your PostgreSQL URL and a long random `SESSION_SECRET`
 3. Copy `apps/web/.env.example` to `apps/web/.env.local`
-4. Source the API env with `source .env`
-5. Start the Go API with `make dev-api`
-6. In a second terminal, start the Next.js UI with `make dev-web`
-7. Navigate to http://localhost:3000
+4. Start the Go API with `make dev-api`
+5. In a second terminal, start the Next.js UI with `make dev-web`
+6. Navigate to http://localhost:3000
 
 The Go tier still serves legacy pages at http://localhost:8080 while the Next.js
 tier is introduced. The Next.js UI uses `API_BASE_URL` to talk to the Go tier.

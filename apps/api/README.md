@@ -4,10 +4,13 @@ The API tier follows a DDD-friendly modular monolith layout.
 
 ```text
 cmd/server
-  process entrypoint and final HTTP wiring
+  process entrypoint
 
 internal/domain
   shared enterprise concepts and domain errors
+
+internal/app/server
+  HTTP application composition, route registration, middleware, and startup
 
 internal/modules
   auth      signup, signin, password verification, session establishment
