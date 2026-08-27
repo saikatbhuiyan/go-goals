@@ -8,13 +8,11 @@ type Workflow = {
 };
 
 type WorkspaceOverviewProps = {
-  apiBaseUrl: string;
   apiOnline: boolean;
   workflows: Workflow[];
 };
 
 export function WorkspaceOverview({
-  apiBaseUrl,
   apiOnline,
   workflows,
 }: WorkspaceOverviewProps) {
@@ -38,7 +36,7 @@ export function WorkspaceOverview({
             key={workflow.title}
             title={workflow.title}
             description={workflow.description}
-            href={`${apiBaseUrl}${workflow.path}`}
+            href={workflow.path}
           />
         ))}
       </div>

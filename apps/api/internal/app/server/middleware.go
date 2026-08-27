@@ -12,14 +12,14 @@ func (a *App) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		session, err := a.store.Get(r, "session-name")
 		if err != nil {
 			log.Printf("Error getting session: %v", err)
-			http.Redirect(w, r, a.webURL("/auth/signin"), http.StatusSeeOther)
+			httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
 		email, ok := session.Values["email"].(string)
 		if !ok || email == "" {
 			log.Printf("No valid email in session")
-			http.Redirect(w, r, a.webURL("/auth/signin"), http.StatusSeeOther)
+			httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
@@ -27,12 +27,12 @@ func (a *App) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		err = a.db.QueryRow("SELECT is_banned FROM users WHERE email = $1", email).Scan(&isBanned)
 		if err != nil {
 			log.Printf("Error checking user ban status: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 			return
 		}
 
 		if isBanned {
-			http.Error(w, "Your account has been banned", http.StatusForbidden)
+			httpx.WriteError(w, http.StatusForbidden, "Your account has been banned")
 			return
 		}
 
@@ -44,20 +44,20 @@ func (a *App) adminAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		session, err := a.store.Get(r, "session-name")
 		if err != nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
 		email, ok := session.Values["email"].(string)
 		if !ok || email == "" {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 
 		var count int
 		err = a.db.QueryRow("SELECT COUNT(*) FROM administrators WHERE email = $1", email).Scan(&count)
 		if err != nil || count == 0 {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 			return
 		}
 

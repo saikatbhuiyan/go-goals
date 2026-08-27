@@ -1,7 +1,7 @@
 import { AppHeader } from "@/components/app-shell/app-header";
 import { SystemBoundary } from "@/components/dashboard/system-boundary";
 import { WorkspaceOverview } from "@/components/dashboard/workspace-overview";
-import { getApiBaseUrl, getApiHealth } from "@/lib/api";
+import { getApiHealth } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +25,6 @@ const workflows = [
 
 export default async function Home() {
   const health = await getApiHealth();
-  const apiBaseUrl = getApiBaseUrl();
   const apiOnline = health?.status === "ok";
 
   return (
@@ -34,7 +33,6 @@ export default async function Home() {
 
       <section className="mx-auto grid max-w-6xl gap-6 px-6 py-8 lg:grid-cols-[1.5fr_1fr]">
         <WorkspaceOverview
-          apiBaseUrl={apiBaseUrl}
           apiOnline={apiOnline}
           workflows={workflows}
         />

@@ -18,7 +18,7 @@ export default function SignUpPage() {
         </>
       }
     >
-      <SignUpForm action={`${apiBaseUrl}/auth/signup`} />
+      <SignUpForm endpoint={`${apiBaseUrl}/api/auth/signup`} />
     </AuthCard>
   );
 }

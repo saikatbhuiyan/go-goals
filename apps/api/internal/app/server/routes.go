@@ -30,29 +30,30 @@ func (a *App) registerPlatformRoutes(mux *http.ServeMux) {
 }
 
 func (a *App) registerAuthRoutes(mux *http.ServeMux, handler *authmodule.Handler) {
-	mux.HandleFunc("/auth/signin", handler.SignIn)
-	mux.HandleFunc("/auth/signup", handler.SignUp)
-	mux.HandleFunc("/auth/logout", a.logoutHandler)
+	mux.HandleFunc("/api/auth/signin", handler.SignIn)
+	mux.HandleFunc("/api/auth/signup", handler.SignUp)
+	mux.HandleFunc("/api/auth/logout", a.logoutHandler)
 }
 
 func (a *App) registerUserRoutes(mux *http.ServeMux, handler *usersmodule.Handler) {
-	mux.HandleFunc("/profile", a.authMiddleware(handler.Profile))
-	mux.HandleFunc("/profile/edit", a.authMiddleware(handler.ProfileEdit))
-	mux.HandleFunc("/users/", handler.PublicProfile)
-	mux.HandleFunc("/follow", a.authMiddleware(handler.Follow))
-	mux.HandleFunc("/unfollow", a.authMiddleware(handler.Unfollow))
-	mux.HandleFunc("/admin/ban-user", a.adminAuthMiddleware(handler.BanUser))
-	mux.HandleFunc("/admin/unban-user", a.adminAuthMiddleware(handler.UnbanUser))
+	mux.HandleFunc("/api/profile", a.authMiddleware(handler.Profile))
+	mux.HandleFunc("/api/profile/edit", a.authMiddleware(handler.ProfileEdit))
+	mux.HandleFunc("/api/users/", handler.PublicProfile)
+	mux.HandleFunc("/api/follow", a.authMiddleware(handler.Follow))
+	mux.HandleFunc("/api/unfollow", a.authMiddleware(handler.Unfollow))
+	mux.HandleFunc("/api/admin/ban-user", a.adminAuthMiddleware(handler.BanUser))
+	mux.HandleFunc("/api/admin/unban-user", a.adminAuthMiddleware(handler.UnbanUser))
 }
 
 func (a *App) registerUpdateRoutes(mux *http.ServeMux, handler *updatesmodule.Handler) {
-	mux.HandleFunc("/aspiration-update", a.authMiddleware(handler.AspirationUpdate))
-	mux.HandleFunc("/aspiration-update/edit/", a.authMiddleware(handler.EditAspirationUpdate))
-	mux.HandleFunc("/aspiration-update/delete/", a.authMiddleware(handler.DeleteAspirationUpdate))
-	mux.HandleFunc("/like", a.authMiddleware(handler.Like))
-	mux.HandleFunc("/unlike", a.authMiddleware(handler.Unlike))
-	mux.HandleFunc("/update/", handler.Permalink)
-	mux.HandleFunc("/comment/add", a.authMiddleware(handler.AddComment))
+	mux.HandleFunc("/api/browse", handler.Browse)
+	mux.HandleFunc("/api/aspiration-updates", a.authMiddleware(handler.AspirationUpdate))
+	mux.HandleFunc("/api/aspiration-updates/edit/", a.authMiddleware(handler.EditAspirationUpdate))
+	mux.HandleFunc("/api/aspiration-updates/delete/", a.authMiddleware(handler.DeleteAspirationUpdate))
+	mux.HandleFunc("/api/like", a.authMiddleware(handler.Like))
+	mux.HandleFunc("/api/unlike", a.authMiddleware(handler.Unlike))
+	mux.HandleFunc("/api/updates/", handler.Permalink)
+	mux.HandleFunc("/api/comments", a.authMiddleware(handler.AddComment))
 }
 
 func (a *App) newAuthHandler() *authmodule.Handler {

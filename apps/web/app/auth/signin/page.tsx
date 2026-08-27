@@ -18,7 +18,7 @@ export default function SignInPage() {
         </>
       }
     >
-      <SignInForm action={`${apiBaseUrl}/auth/signin`} />
+      <SignInForm endpoint={`${apiBaseUrl}/api/auth/signin`} />
     </AuthCard>
   );
 }

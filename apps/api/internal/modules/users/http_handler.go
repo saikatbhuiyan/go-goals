@@ -2,11 +2,9 @@ package users
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
-	"strconv"
 	"strings"
 
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/domain"
@@ -19,60 +17,91 @@ type Handler struct {
 	store *gorillasessions.CookieStore
 }
 
+type updateProfileRequest struct {
+	Username        string `json:"username"`
+	DisplayName     string `json:"display_name"`
+	LifeAspirations string `json:"life_aspirations"`
+	ThingsILikeToDo string `json:"things_i_like_to_do"`
+	Bio             string `json:"bio"`
+	BioLink         string `json:"bio_link"`
+}
+
+type moderationRequest struct {
+	UserID int `json:"user_id"`
+}
+
+type followRequest struct {
+	Username string `json:"username"`
+}
+
 func NewHandler(db *sql.DB, store *gorillasessions.CookieStore) *Handler {
 	return &Handler{db: db, store: store}
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
 	email, ok := httpx.EmailFromContext(r.Context())
 	if !ok {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
 	var userID int
 	err := h.db.QueryRow("SELECT id FROM users WHERE email = $1", email).Scan(&userID)
 	if err != nil {
-		http.Error(w, (&domain.DatabaseError{Operation: "fetching user ID", Err: err}).Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, (&domain.DatabaseError{Operation: "fetching user ID", Err: err}).Error())
 		return
 	}
 
 	page := pageFromRequest(r)
 	profileData, err := h.getProfileData(userID, userID, page, 5)
 	if err != nil {
-		http.Error(w, (&domain.DatabaseError{Operation: "fetching profile data", Err: err}).Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, (&domain.DatabaseError{Operation: "fetching profile data", Err: err}).Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, profileData)
+	httpx.WriteJSON(w, http.StatusOK, profileData)
 }
 
 func (h *Handler) ProfileEdit(w http.ResponseWriter, r *http.Request) {
 	email, ok := httpx.EmailFromContext(r.Context())
 	if !ok {
-		http.Redirect(w, r, "/", http.StatusSeeOther)
+		httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
 		return
 	}
 
-	if r.Method == http.MethodPost {
+	if r.Method == http.MethodPost || r.Method == http.MethodPut || r.Method == http.MethodPatch {
 		h.updateProfile(w, r, email)
+		return
+	}
+	if r.Method != http.MethodGet {
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	var user domain.User
 	err := h.db.QueryRow("SELECT email, COALESCE(username, ''), COALESCE(display_name, ''), life_aspirations, things_i_like_to_do, profile_image_url, bio, bio_link FROM users WHERE email = $1", email).Scan(&user.Email, &user.Username, &user.DisplayName, &user.LifeAspirations, &user.ThingsILikeToDo, &user.ProfileImageURL, &user.Bio, &user.BioLink)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 
-	writeJSON(w, http.StatusOK, user)
+	httpx.WriteJSON(w, http.StatusOK, user)
 }
 
 func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
-	username := strings.TrimPrefix(r.URL.Path, "/users/")
+	if r.Method != http.MethodGet {
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	username := strings.TrimPrefix(r.URL.Path, "/api/users/")
 	if username == "" {
-		http.NotFound(w, r)
+		httpx.WriteError(w, http.StatusNotFound, "User not found")
 		return
 	}
 
@@ -81,11 +110,11 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 	err := h.db.QueryRow("SELECT id, is_banned FROM users WHERE username = $1", username).Scan(&userID, &isBanned)
 	if err == sql.ErrNoRows {
 		log.Printf("User not found: %s", username)
-		http.NotFound(w, r)
+		httpx.WriteError(w, http.StatusNotFound, "User not found")
 		return
 	} else if err != nil {
 		log.Printf("Database error when fetching user %s: %v", username, err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -98,13 +127,13 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 		err = h.db.QueryRow("SELECT COUNT(*) > 0 FROM administrators WHERE email = $1", currentUserEmail).Scan(&isAdmin)
 		if err != nil {
 			log.Printf("Error checking admin status: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 			return
 		}
 	}
 
 	if isBanned && !isAdmin {
-		http.Error(w, "This user's profile is not available", http.StatusForbidden)
+		httpx.WriteError(w, http.StatusForbidden, "This user's profile is not available")
 		return
 	}
 
@@ -113,7 +142,7 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 		err = h.db.QueryRow("SELECT id FROM users WHERE email = $1", currentUserEmail).Scan(&currentUserID)
 		if err != nil && err != sql.ErrNoRows {
 			log.Printf("Database error when fetching current user ID: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+			httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 			return
 		}
 	}
@@ -121,7 +150,7 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 	profileData, err := h.getProfileData(userID, currentUserID, pageFromRequest(r), 5)
 	if err != nil {
 		log.Printf("Error fetching profile data: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Internal server error")
 		return
 	}
 
@@ -139,24 +168,28 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 		IsBanned:     isBanned,
 	}
 
-	writeJSON(w, http.StatusOK, data)
+	httpx.WriteJSON(w, http.StatusOK, data)
 }
 
 func (h *Handler) BanUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	userID, err := strconv.Atoi(r.FormValue("user_id"))
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+	var request moderationRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+	if request.UserID <= 0 {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	_, err = h.db.Exec("UPDATE users SET is_banned = true WHERE id = $1", userID)
+	_, err := h.db.Exec("UPDATE users SET is_banned = true WHERE id = $1", request.UserID)
 	if err != nil {
-		http.Error(w, "Failed to ban user", http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to ban user")
 		return
 	}
 
@@ -165,19 +198,23 @@ func (h *Handler) BanUser(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) UnbanUser(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	userID, err := strconv.Atoi(r.FormValue("user_id"))
-	if err != nil {
-		http.Error(w, "Invalid user ID", http.StatusBadRequest)
+	var request moderationRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+	if request.UserID <= 0 {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid user ID")
 		return
 	}
 
-	_, err = h.db.Exec("UPDATE users SET is_banned = false WHERE id = $1", userID)
+	_, err := h.db.Exec("UPDATE users SET is_banned = false WHERE id = $1", request.UserID)
 	if err != nil {
-		http.Error(w, "Failed to unban user", http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to unban user")
 		return
 	}
 
@@ -185,40 +222,51 @@ func (h *Handler) UnbanUser(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Follow(w http.ResponseWriter, r *http.Request) {
-	email, ok := httpx.EmailFromContext(r.Context())
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	if r.Method != http.MethodPost {
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	username := r.FormValue("username")
+	email, ok := httpx.EmailFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var request followRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	username := strings.TrimSpace(request.Username)
 	if username == "" {
-		http.Error(w, "Missing username", http.StatusBadRequest)
+		httpx.WriteError(w, http.StatusBadRequest, "Missing username")
 		return
 	}
 
 	var followerID int
 	err := h.db.QueryRow("SELECT id FROM users WHERE email = $1", email).Scan(&followerID)
 	if err != nil {
-		http.Error(w, "Failed to get follower ID: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to get follower ID: "+err.Error())
 		return
 	}
 
 	var followedID int
 	err = h.db.QueryRow("SELECT id FROM users WHERE username = $1", username).Scan(&followedID)
 	if err != nil {
-		http.Error(w, "Failed to get followed ID: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to get followed ID: "+err.Error())
 		return
 	}
 
 	if followerID == followedID {
-		http.Error(w, "You cannot follow yourself", http.StatusBadRequest)
+		httpx.WriteError(w, http.StatusBadRequest, "You cannot follow yourself")
 		return
 	}
 
 	_, err = h.db.Exec("INSERT INTO followers (follower_id, followed_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", followerID, followedID)
 	if err != nil {
-		http.Error(w, "Failed to follow user: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to follow user: "+err.Error())
 		return
 	}
 
@@ -226,35 +274,46 @@ func (h *Handler) Follow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Unfollow(w http.ResponseWriter, r *http.Request) {
-	email, ok := httpx.EmailFromContext(r.Context())
-	if !ok {
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+	if r.Method != http.MethodPost {
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	username := r.FormValue("username")
+	email, ok := httpx.EmailFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var request followRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	username := strings.TrimSpace(request.Username)
 	if username == "" {
-		http.Error(w, "Missing username", http.StatusBadRequest)
+		httpx.WriteError(w, http.StatusBadRequest, "Missing username")
 		return
 	}
 
 	var followerID int
 	err := h.db.QueryRow("SELECT id FROM users WHERE email = $1", email).Scan(&followerID)
 	if err != nil {
-		http.Error(w, "Failed to get follower ID: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to get follower ID: "+err.Error())
 		return
 	}
 
 	var followedID int
 	err = h.db.QueryRow("SELECT id FROM users WHERE username = $1", username).Scan(&followedID)
 	if err != nil {
-		http.Error(w, "Failed to get followed ID: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to get followed ID: "+err.Error())
 		return
 	}
 
 	_, err = h.db.Exec("DELETE FROM followers WHERE follower_id = $1 AND followed_id = $2", followerID, followedID)
 	if err != nil {
-		http.Error(w, "Failed to unfollow user: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to unfollow user: "+err.Error())
 		return
 	}
 
@@ -262,22 +321,28 @@ func (h *Handler) Unfollow(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request, email string) {
-	username := strings.ToLower(r.FormValue("username"))
-	displayName := r.FormValue("display_name")
-	lifeAspirations := r.FormValue("life_aspirations")
-	thingsILikeToDo := r.FormValue("things_i_like_to_do")
-	bio := r.FormValue("bio")
-	bioLink := r.FormValue("bio_link")
+	var request updateProfileRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	username := strings.ToLower(strings.TrimSpace(request.Username))
+	displayName := strings.TrimSpace(request.DisplayName)
+	lifeAspirations := strings.TrimSpace(request.LifeAspirations)
+	thingsILikeToDo := strings.TrimSpace(request.ThingsILikeToDo)
+	bio := strings.TrimSpace(request.Bio)
+	bioLink := strings.TrimSpace(request.BioLink)
 
 	if username == "" {
-		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
+		httpx.WriteError(w, http.StatusBadRequest, "Username cannot be empty")
 		return
 	}
 
 	var currentUsername sql.NullString
 	err := h.db.QueryRow("SELECT username FROM users WHERE email = $1", email).Scan(&currentUsername)
 	if err != nil && err != sql.ErrNoRows {
-		http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Database error: "+err.Error())
 		return
 	}
 
@@ -285,11 +350,11 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request, email st
 		var count int
 		err := h.db.QueryRow("SELECT COUNT(*) FROM users WHERE username = $1 AND email != $2", username, email).Scan(&count)
 		if err != nil {
-			http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+			httpx.WriteError(w, http.StatusInternalServerError, "Database error: "+err.Error())
 			return
 		}
 		if count > 0 {
-			http.Error(w, "Username is already taken", http.StatusConflict)
+			httpx.WriteError(w, http.StatusConflict, "Username is already taken")
 			return
 		}
 	}
@@ -303,7 +368,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request, email st
 		sql.NullString{String: bioLink, Valid: bioLink != ""},
 		email)
 	if err != nil {
-		http.Error(w, "Failed to update user: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to update user: "+err.Error())
 		return
 	}
 
@@ -344,20 +409,14 @@ func (h *Handler) getProfileData(userID int, currentUserID int, page int, pageSi
 	}
 	defer rows.Close()
 
-	var updates []struct {
-		domain.AspirationUpdate
-		IsOwnPost bool
-	}
+	var updates []ProfileUpdate
 	for rows.Next() {
 		var update domain.AspirationUpdate
 		var isOwnPost bool
 		if err := rows.Scan(&update.ID, &update.Content, &update.CreatedAt, &update.LikeCount, &update.CommentCount, &update.Liked, &isOwnPost, &update.ProfileImageURL); err != nil {
 			return ProfileData{}, err
 		}
-		updates = append(updates, struct {
-			domain.AspirationUpdate
-			IsOwnPost bool
-		}{update, isOwnPost})
+		updates = append(updates, ProfileUpdate{AspirationUpdate: update, IsOwnPost: isOwnPost})
 	}
 
 	var isFollowing bool
@@ -422,23 +481,25 @@ func (h *Handler) getProfileData(userID int, currentUserID int, page int, pageSi
 }
 
 type ProfileData struct {
-	User    domain.User
-	Updates []struct {
-		domain.AspirationUpdate
-		IsOwnPost bool
-	}
-	IsFollowing     bool
-	FollowerCount   int
-	RecentFollowers []RecentFollower
-	CurrentPage     int
-	TotalPages      int
-	PreviousPage    int
-	NextPage        int
+	User            domain.User      `json:"user"`
+	Updates         []ProfileUpdate  `json:"updates"`
+	IsFollowing     bool             `json:"is_following"`
+	FollowerCount   int              `json:"follower_count"`
+	RecentFollowers []RecentFollower `json:"recent_followers"`
+	CurrentPage     int              `json:"current_page"`
+	TotalPages      int              `json:"total_pages"`
+	PreviousPage    int              `json:"previous_page"`
+	NextPage        int              `json:"next_page"`
+}
+
+type ProfileUpdate struct {
+	domain.AspirationUpdate
+	IsOwnPost bool `json:"is_own_post"`
 }
 
 type RecentFollower struct {
-	Username        string
-	ProfileImageURL string
+	Username        string `json:"username"`
+	ProfileImageURL string `json:"profile_image_url"`
 }
 
 func pageFromRequest(r *http.Request) int {
@@ -449,10 +510,4 @@ func pageFromRequest(r *http.Request) int {
 		}
 	}
 	return page
-}
-
-func writeJSON(w http.ResponseWriter, statusCode int, value interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	_ = json.NewEncoder(w).Encode(value)
 }

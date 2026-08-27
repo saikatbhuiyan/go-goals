@@ -1,6 +1,10 @@
 package server
 
-import "net/http"
+import (
+	"net/http"
+
+	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
+)
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -9,13 +13,18 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *App) logoutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
 	session, _ := a.store.Get(r, "session-name")
 	session.Values["email"] = nil
 	session.Options.MaxAge = -1
 	err := session.Save(r, w)
 	if err != nil {
-		http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to save session: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, a.webURL("/"), http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }

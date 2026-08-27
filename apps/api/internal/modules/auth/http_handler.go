@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
 	gorillasessions "github.com/gorilla/sessions"
 )
 
@@ -12,6 +13,23 @@ type Handler struct {
 	service   *Service
 	store     *gorillasessions.CookieStore
 	webOrigin string
+}
+
+type signInRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
+type signUpRequest struct {
+	Email           string `json:"email"`
+	Username        string `json:"username"`
+	DisplayName     string `json:"display_name"`
+	Password        string `json:"password"`
+	ConfirmPassword string `json:"confirm_password"`
+}
+
+type authResponse struct {
+	Status string `json:"status"`
 }
 
 func NewHandler(service *Service, store *gorillasessions.CookieStore, webOrigin string) *Handler {
@@ -28,31 +46,37 @@ func (h *Handler) SignIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
-	email := NormalizeEmail(r.FormValue("email"))
-	password := r.FormValue("password")
+	var request signInRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
+		return
+	}
+
+	email := NormalizeEmail(request.Email)
+	password := request.Password
 
 	err := h.service.SignIn(r.Context(), email, password)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrInvalidCredentials):
-			http.Error(w, "Invalid email or password", http.StatusUnauthorized)
+			httpx.WriteError(w, http.StatusUnauthorized, "Invalid email or password")
 		case errors.Is(err, ErrBannedAccount):
-			http.Error(w, "Your account has been banned", http.StatusForbidden)
+			httpx.WriteError(w, http.StatusForbidden, "Your account has been banned")
 		default:
-			http.Error(w, "Database error: "+err.Error(), http.StatusInternalServerError)
+			httpx.WriteError(w, http.StatusInternalServerError, "Database error: "+err.Error())
 		}
 		return
 	}
 
 	if err := h.signInUser(w, r, email); err != nil {
-		http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to save session: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, h.webURL("/"), http.StatusSeeOther)
+	httpx.WriteJSON(w, http.StatusOK, authResponse{Status: "signed_in"})
 }
 
 func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) {
@@ -61,28 +85,34 @@ func (h *Handler) SignUp(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		httpx.WriteError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	var request signUpRequest
+	if err := httpx.ReadJSON(w, r, &request); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "Invalid JSON request body")
 		return
 	}
 
 	input := SignUpInput{
-		Email:           r.FormValue("email"),
-		Username:        r.FormValue("username"),
-		DisplayName:     r.FormValue("display_name"),
-		Password:        r.FormValue("password"),
-		ConfirmPassword: r.FormValue("confirm_password"),
+		Email:           request.Email,
+		Username:        request.Username,
+		DisplayName:     request.DisplayName,
+		Password:        request.Password,
+		ConfirmPassword: request.ConfirmPassword,
 	}
 	email, err := h.service.SignUp(r.Context(), input)
 	if err != nil {
-		http.Error(w, messageForSignUpError(err), http.StatusBadRequest)
+		httpx.WriteError(w, http.StatusBadRequest, messageForSignUpError(err))
 		return
 	}
 
 	if err := h.signInUser(w, r, email); err != nil {
-		http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
+		httpx.WriteError(w, http.StatusInternalServerError, "Failed to save session: "+err.Error())
 		return
 	}
-	http.Redirect(w, r, h.webURL("/"), http.StatusSeeOther)
+	httpx.WriteJSON(w, http.StatusCreated, authResponse{Status: "signed_up"})
 }
 
 func (h *Handler) signInUser(w http.ResponseWriter, r *http.Request, email string) error {
