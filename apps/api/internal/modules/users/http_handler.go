@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/domain"
-	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
+	"github.com/saikatbhuiyan/go-goals/apps/api/internal/domain"
+	"github.com/saikatbhuiyan/go-goals/apps/api/internal/platform/httpx"
 	gorillasessions "github.com/gorilla/sessions"
 )
 

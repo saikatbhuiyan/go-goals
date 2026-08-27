@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	serverapp "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/app/server"
+	serverapp "github.com/saikatbhuiyan/go-goals/apps/api/internal/app/server"
 )
 
 func main() {

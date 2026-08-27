@@ -3,10 +3,10 @@ package server
 import (
 	"net/http"
 
-	authmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/auth"
-	updatesmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/updates"
-	usersmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/users"
-	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
+	authmodule "github.com/saikatbhuiyan/go-goals/apps/api/internal/modules/auth"
+	updatesmodule "github.com/saikatbhuiyan/go-goals/apps/api/internal/modules/updates"
+	usersmodule "github.com/saikatbhuiyan/go-goals/apps/api/internal/modules/users"
+	"github.com/saikatbhuiyan/go-goals/apps/api/internal/platform/httpx"
 )
 
 func (a *App) Handler() http.Handler {

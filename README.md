@@ -178,7 +178,7 @@ If you visit ECS and your staging cluster has 0 Container Instances (or there ar
 terraform destroy
 ```
 
-Confirm your terraform configuration matches [this commit on Erik's workshop branch](https://github.com/ALT-F4-LLC/fem-fd-service/tree/94ee588f97cc00f5a13aec486df08a5bc04deb22). Then redeploy the infrastructure with the init, plan and apply commands:
+Confirm your terraform configuration matches [this commit on Erik's workshop branch](https://github.com/saikatbhuiyan/go-goals/tree/94ee588f97cc00f5a13aec486df08a5bc04deb22). Then redeploy the infrastructure with the init, plan and apply commands:
 
 ```bash
 terraform init

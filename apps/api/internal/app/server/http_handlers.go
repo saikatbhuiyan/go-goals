@@ -3,7 +3,7 @@ package server
 import (
 	"net/http"
 
-	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
+	"github.com/saikatbhuiyan/go-goals/apps/api/internal/platform/httpx"
 )
 
 func healthHandler(w http.ResponseWriter, r *http.Request) {
