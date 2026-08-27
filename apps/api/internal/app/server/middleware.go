@@ -4,7 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/saikatbhuiyan/go-goals/apps/api/internal/platform/httpx"
+	"github.com/saikatbhuiyan/go-goals/internal/platform/httpx"
 )
 
 func (a *App) authMiddleware(next http.HandlerFunc) http.HandlerFunc {

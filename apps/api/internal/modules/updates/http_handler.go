@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/saikatbhuiyan/go-goals/apps/api/internal/domain"
-	"github.com/saikatbhuiyan/go-goals/apps/api/internal/platform/httpx"
 	gorillasessions "github.com/gorilla/sessions"
+	"github.com/saikatbhuiyan/go-goals/internal/domain"
+	"github.com/saikatbhuiyan/go-goals/internal/platform/httpx"
 )
 
 type Handler struct {
