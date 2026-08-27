@@ -18,7 +18,7 @@ microservices without forcing an early distributed-system rewrite.
 
 3. Data tier: PostgreSQL
    - Local development is managed by `docker-compose.yml`.
-   - Schema changes live in `migrations/`.
+   - Schema changes live in `apps/api/migrations/`.
    - The application tier is the only tier that should talk directly to PostgreSQL.
 
 ## Backend Module Boundaries
@@ -28,12 +28,16 @@ The Go backend should evolve toward this structure:
 ```text
 apps/api/
   cmd/server/          # executable entrypoint
+  internal/app/        # application composition and HTTP bootstrap
   internal/platform/   # shared server, config, database, sessions
   internal/modules/
     auth/              # signup, signin, password hashing, sessions
     users/             # profiles, follows, administrators
     updates/           # aspiration updates, likes, comments
     pages/             # static/document pages while templates remain in Go
+  migrations/          # database migrations owned by the API tier
+  templates/           # legacy server-rendered views
+  static/              # legacy server-rendered assets
 ```
 
 Modules may share platform primitives, but they should not reach into each

@@ -24,11 +24,12 @@ This application is a social media platform for setting and sharing life goals a
 ### Repository Layout
 
 ```text
-apps/api   Go application/API tier
-apps/web   Next.js UI tier
-migrations PostgreSQL schema changes
-templates  Legacy Go-rendered pages during the UI migration
-static     Legacy Go-rendered assets during the UI migration
+apps/api              Go application/API tier
+apps/api/migrations   PostgreSQL schema changes for the API tier
+apps/api/templates    Legacy Go-rendered pages during the UI migration
+apps/api/static       Legacy Go-rendered assets during the UI migration
+apps/web              Next.js UI tier
+docs                  Architecture and project notes
 ```
 
 ### Docker Setup

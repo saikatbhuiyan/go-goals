@@ -17,8 +17,8 @@ type Config struct {
 func Load() Config {
 	return Config{
 		HTTPAddr:      envOrDefault("HTTP_ADDR", ":8080"),
-		TemplatesDir:  envOrDefault("TEMPLATES_DIR", "templates"),
-		StaticDir:     envOrDefault("STATIC_DIR", "static"),
+		TemplatesDir:  envOrDefault("TEMPLATES_DIR", "apps/api/templates"),
+		StaticDir:     envOrDefault("STATIC_DIR", "apps/api/static"),
 		SessionSecret: envOrDefault("SESSION_SECRET", "development-session-secret"),
 		WebOrigin:     envOrDefault("WEB_ORIGIN", "http://localhost:3000"),
 	}

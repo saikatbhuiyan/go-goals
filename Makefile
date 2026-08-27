@@ -4,7 +4,7 @@ export
 endif
 
 GOOSE ?= go run github.com/pressly/goose/v3/cmd/goose@latest
-MIGRATIONS_DIR ?= migrations
+MIGRATIONS_DIR ?= apps/api/migrations
 DB_DRIVER ?= postgres
 MIGRATION_NAME ?= change
 
