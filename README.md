@@ -26,8 +26,6 @@ This application is a social media platform for setting and sharing life goals a
 ```text
 apps/api              Go application/API tier
 apps/api/migrations   PostgreSQL schema changes for the API tier
-apps/api/templates    Legacy Go-rendered pages during the UI migration
-apps/api/static       Legacy Go-rendered assets during the UI migration
 apps/web              Next.js UI tier
 docs                  Architecture and project notes
 ```
@@ -62,8 +60,7 @@ WHERE email = 'user@example.com';
 5. In a second terminal, start the Next.js UI with `make dev-web`
 6. Navigate to http://localhost:3000
 
-The Go tier still serves legacy pages at http://localhost:8080 while the Next.js
-tier is introduced. The Next.js UI uses `API_BASE_URL` to talk to the Go tier.
+The Next.js UI uses `API_BASE_URL` to talk to the Go API tier.
 
 ### Verification
 

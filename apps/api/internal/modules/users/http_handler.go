@@ -2,8 +2,8 @@ package users
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
 	"strconv"
@@ -14,16 +14,13 @@ import (
 	gorillasessions "github.com/gorilla/sessions"
 )
 
-type TemplatePathFunc func(string) string
-
 type Handler struct {
-	db           *sql.DB
-	store        *gorillasessions.CookieStore
-	templatePath TemplatePathFunc
+	db    *sql.DB
+	store *gorillasessions.CookieStore
 }
 
-func NewHandler(db *sql.DB, store *gorillasessions.CookieStore, templatePath TemplatePathFunc) *Handler {
-	return &Handler{db: db, store: store, templatePath: templatePath}
+func NewHandler(db *sql.DB, store *gorillasessions.CookieStore) *Handler {
+	return &Handler{db: db, store: store}
 }
 
 func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
@@ -47,19 +44,7 @@ func (h *Handler) Profile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if profileData.User.Username == "" {
-		http.Redirect(w, r, "/profile/edit", http.StatusSeeOther)
-		return
-	}
-
-	tmpl, err := template.ParseFiles(h.templatePath("profile.html"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	if err := tmpl.Execute(w, profileData); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, profileData)
 }
 
 func (h *Handler) ProfileEdit(w http.ResponseWriter, r *http.Request) {
@@ -81,7 +66,7 @@ func (h *Handler) ProfileEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.renderProfileEditPage(w, user, "")
+	writeJSON(w, http.StatusOK, user)
 }
 
 func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
@@ -140,13 +125,6 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tmpl, err := template.ParseFiles(h.templatePath("public_profile.html"))
-	if err != nil {
-		log.Printf("Template parsing error: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-
 	data := struct {
 		ProfileData
 		IsOwnProfile bool
@@ -161,10 +139,7 @@ func (h *Handler) PublicProfile(w http.ResponseWriter, r *http.Request) {
 		IsBanned:     isBanned,
 	}
 
-	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("Template execution error: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	writeJSON(w, http.StatusOK, data)
 }
 
 func (h *Handler) BanUser(w http.ResponseWriter, r *http.Request) {
@@ -185,7 +160,7 @@ func (h *Handler) BanUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/users/"+r.FormValue("username"), http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) UnbanUser(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +181,7 @@ func (h *Handler) UnbanUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, "/users/"+r.FormValue("username"), http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) Follow(w http.ResponseWriter, r *http.Request) {
@@ -295,7 +270,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request, email st
 	bioLink := r.FormValue("bio_link")
 
 	if username == "" {
-		h.renderProfileEditPage(w, domain.User{Email: email}, "Username cannot be empty")
+		http.Error(w, "Username cannot be empty", http.StatusBadRequest)
 		return
 	}
 
@@ -314,7 +289,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request, email st
 			return
 		}
 		if count > 0 {
-			h.renderProfileEditPage(w, domain.User{Email: email, Username: username}, "Username is already taken")
+			http.Error(w, "Username is already taken", http.StatusConflict)
 			return
 		}
 	}
@@ -332,27 +307,7 @@ func (h *Handler) updateProfile(w http.ResponseWriter, r *http.Request, email st
 		return
 	}
 
-	http.Redirect(w, r, "/profile", http.StatusSeeOther)
-}
-
-func (h *Handler) renderProfileEditPage(w http.ResponseWriter, user domain.User, errorMessage string) {
-	tmpl, err := template.ParseFiles(h.templatePath("profile_edit.html"))
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	data := struct {
-		User         domain.User
-		ErrorMessage string
-	}{
-		User:         user,
-		ErrorMessage: errorMessage,
-	}
-
-	if err := tmpl.Execute(w, data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) getProfileData(userID int, currentUserID int, page int, pageSize int) (ProfileData, error) {
@@ -494,4 +449,10 @@ func pageFromRequest(r *http.Request) int {
 		}
 	}
 	return page
+}
+
+func writeJSON(w http.ResponseWriter, statusCode int, value interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(value)
 }

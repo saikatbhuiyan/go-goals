@@ -17,5 +17,5 @@ func (a *App) logoutHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to save session: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	http.Redirect(w, r, a.webURL("/"), http.StatusSeeOther)
 }

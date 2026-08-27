@@ -34,10 +34,7 @@ apps/api/
     auth/              # signup, signin, password hashing, sessions
     users/             # profiles, follows, administrators
     updates/           # aspiration updates, likes, comments
-    pages/             # static/document pages while templates remain in Go
   migrations/          # database migrations owned by the API tier
-  templates/           # legacy server-rendered views
-  static/              # legacy server-rendered assets
 ```
 
 Modules may share platform primitives, but they should not reach into each
@@ -72,6 +69,5 @@ The Next.js UI should use:
 - Typed environment variables.
 - A generated or hand-maintained API client around the Go HTTP API.
 
-The first migration keeps the existing Go templates running while `apps/web`
-is introduced. After feature parity exists in Next.js, Go template rendering can
-be removed and the Go tier can become API-only.
+The Go tier is API-only. Browser rendering, forms, and user-facing pages belong
+to `apps/web`.

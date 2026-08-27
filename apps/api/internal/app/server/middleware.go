@@ -12,14 +12,14 @@ func (a *App) authMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		session, err := a.store.Get(r, "session-name")
 		if err != nil {
 			log.Printf("Error getting session: %v", err)
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			http.Redirect(w, r, a.webURL("/auth/signin"), http.StatusSeeOther)
 			return
 		}
 
 		email, ok := session.Values["email"].(string)
 		if !ok || email == "" {
 			log.Printf("No valid email in session")
-			http.Redirect(w, r, "/", http.StatusSeeOther)
+			http.Redirect(w, r, a.webURL("/auth/signin"), http.StatusSeeOther)
 			return
 		}
 

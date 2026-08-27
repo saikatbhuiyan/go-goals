@@ -2,8 +2,7 @@ package updates
 
 import (
 	"database/sql"
-	"fmt"
-	"html/template"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strings"
@@ -13,16 +12,13 @@ import (
 	gorillasessions "github.com/gorilla/sessions"
 )
 
-type TemplatePathFunc func(string) string
-
 type Handler struct {
-	db           *sql.DB
-	store        *gorillasessions.CookieStore
-	templatePath TemplatePathFunc
+	db    *sql.DB
+	store *gorillasessions.CookieStore
 }
 
-func NewHandler(db *sql.DB, store *gorillasessions.CookieStore, templatePath TemplatePathFunc) *Handler {
-	return &Handler{db: db, store: store, templatePath: templatePath}
+func NewHandler(db *sql.DB, store *gorillasessions.CookieStore) *Handler {
+	return &Handler{db: db, store: store}
 }
 
 func (h *Handler) AspirationUpdate(w http.ResponseWriter, r *http.Request) {
@@ -66,7 +62,7 @@ func (h *Handler) AspirationUpdate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.Redirect(w, r, "/profile", http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) EditAspirationUpdate(w http.ResponseWriter, r *http.Request) {
@@ -92,37 +88,28 @@ func (h *Handler) EditAspirationUpdate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.Method == http.MethodPost {
-		content := r.FormValue("content")
-		if content == "" {
-			http.Error(w, "Content cannot be empty", http.StatusBadRequest)
-			return
-		}
-
-		_, err = h.db.Exec("UPDATE aspiration_updates SET content = $1 WHERE id = $2", content, updateID)
-		if err != nil {
-			http.Error(w, "Failed to update aspiration update: "+err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		http.Redirect(w, r, "/profile", http.StatusSeeOther)
+	if r.Method == http.MethodGet {
+		writeJSON(w, http.StatusOK, update)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	tmpl, err := template.ParseFiles(h.templatePath("edit_aspiration_update.html"))
+	content := r.FormValue("content")
+	if content == "" {
+		http.Error(w, "Content cannot be empty", http.StatusBadRequest)
+		return
+	}
+
+	_, err = h.db.Exec("UPDATE aspiration_updates SET content = $1 WHERE id = $2", content, updateID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "Failed to update aspiration update: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	data := struct {
-		UpdateID string
-		Content  string
-	}{UpdateID: updateID, Content: update.Content}
-
-	if err := tmpl.Execute(w, data); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) DeleteAspirationUpdate(w http.ResponseWriter, r *http.Request) {
@@ -162,7 +149,7 @@ func (h *Handler) DeleteAspirationUpdate(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	http.Redirect(w, r, "/profile", http.StatusSeeOther)
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (h *Handler) Like(w http.ResponseWriter, r *http.Request) {
@@ -294,27 +281,7 @@ func (h *Handler) Permalink(w http.ResponseWriter, r *http.Request) {
 		IsAuthenticated: currentUserID != 0,
 	}
 
-	funcMap := template.FuncMap{
-		"commentContext": func(root interface{}, comment *domain.Comment) domain.CommentContext {
-			pageData := root.(UpdatePageData)
-			return domain.CommentContext{
-				Root:            root,
-				Comment:         comment,
-				UpdateID:        pageData.Update.ID,
-				IsAuthenticated: pageData.IsAuthenticated,
-			}
-		},
-	}
-
-	tmpl, err := template.New("aspiration_update.html").Funcs(funcMap).ParseFiles(h.templatePath("aspiration_update.html"))
-	if err != nil {
-		log.Printf("Error parsing template: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-		return
-	}
-	if err := tmpl.Execute(w, data); err != nil {
-		log.Printf("Error executing template: %v", err)
-	}
+	writeJSON(w, http.StatusOK, data)
 }
 
 func (h *Handler) AddComment(w http.ResponseWriter, r *http.Request) {
@@ -348,7 +315,13 @@ func (h *Handler) AddComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, fmt.Sprintf("/update/%s", updateID), http.StatusSeeOther)
+	writeJSON(w, http.StatusCreated, struct {
+		ID       int64  `json:"id"`
+		UpdateID string `json:"update_id"`
+	}{
+		ID:       commentID,
+		UpdateID: updateID,
+	})
 }
 
 type UpdatePageData struct {
@@ -438,4 +411,10 @@ func countTotalComments(comments []*domain.Comment) int {
 		total += countTotalComments(comment.Replies)
 	}
 	return total
+}
+
+func writeJSON(w http.ResponseWriter, statusCode int, value interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(statusCode)
+	_ = json.NewEncoder(w).Encode(value)
 }

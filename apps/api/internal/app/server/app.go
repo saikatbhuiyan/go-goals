@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/config"
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/postgres"
@@ -35,10 +36,10 @@ func (a *App) Start() error {
 	return http.ListenAndServe(a.cfg.HTTPAddr, a.Handler())
 }
 
-func (a *App) templatePath(name string) string {
-	return a.cfg.TemplatePath(name)
-}
-
-func (a *App) staticPath(name string) string {
-	return a.cfg.StaticPath(name)
+func (a *App) webURL(path string) string {
+	webOrigin := strings.TrimRight(a.cfg.WebOrigin, "/")
+	if webOrigin == "" {
+		return path
+	}
+	return webOrigin + path
 }

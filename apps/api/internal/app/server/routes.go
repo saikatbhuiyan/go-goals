@@ -1,12 +1,9 @@
 package server
 
 import (
-	"mime"
 	"net/http"
-	"path/filepath"
 
 	authmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/auth"
-	pagesmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/pages"
 	updatesmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/updates"
 	usersmodule "github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/modules/users"
 	"github.com/ALT-F4-LLC/fem-fd-service/apps/api/internal/platform/httpx"
@@ -16,12 +13,10 @@ func (a *App) Handler() http.Handler {
 	mux := http.NewServeMux()
 
 	authHandler := a.newAuthHandler()
-	pagesHandler := pagesmodule.NewHandler(a.db, a.store, a.templatePath)
-	usersHandler := usersmodule.NewHandler(a.db, a.store, a.templatePath)
-	updatesHandler := updatesmodule.NewHandler(a.db, a.store, a.templatePath)
+	usersHandler := usersmodule.NewHandler(a.db, a.store)
+	updatesHandler := updatesmodule.NewHandler(a.db, a.store)
 
 	a.registerPlatformRoutes(mux)
-	a.registerPageRoutes(mux, pagesHandler)
 	a.registerAuthRoutes(mux, authHandler)
 	a.registerUserRoutes(mux, usersHandler)
 	a.registerUpdateRoutes(mux, updatesHandler)
@@ -30,25 +25,8 @@ func (a *App) Handler() http.Handler {
 }
 
 func (a *App) registerPlatformRoutes(mux *http.ServeMux) {
-	fs := http.FileServer(http.Dir(a.cfg.StaticDir))
-	mux.Handle("/static/", http.StripPrefix("/static/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		path := a.staticPath(r.URL.Path)
-		contentType := mime.TypeByExtension(filepath.Ext(path))
-		if contentType != "" {
-			w.Header().Set("Content-Type", contentType)
-		}
-		fs.ServeHTTP(w, r)
-	})))
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.HandleFunc("/api/health", healthHandler)
-}
-
-func (a *App) registerPageRoutes(mux *http.ServeMux, handler *pagesmodule.Handler) {
-	mux.HandleFunc("/", handler.HomePage)
-	mux.HandleFunc("/browse", handler.Browse)
-	mux.HandleFunc("/terms", handler.StaticPage("pages/doc_terms.html"))
-	mux.HandleFunc("/privacy", handler.StaticPage("pages/doc_privacy.html"))
-	mux.HandleFunc("/community-guidelines", handler.StaticPage("pages/doc_community_guidelines.html"))
 }
 
 func (a *App) registerAuthRoutes(mux *http.ServeMux, handler *authmodule.Handler) {
@@ -80,5 +58,5 @@ func (a *App) registerUpdateRoutes(mux *http.ServeMux, handler *updatesmodule.Ha
 func (a *App) newAuthHandler() *authmodule.Handler {
 	authRepository := authmodule.NewPostgresRepository(a.db)
 	authService := authmodule.NewService(authRepository, authmodule.PasswordHasher{})
-	return authmodule.NewHandler(authService, a.store, a.templatePath)
+	return authmodule.NewHandler(authService, a.store, a.cfg.WebOrigin)
 }
