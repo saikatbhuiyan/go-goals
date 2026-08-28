@@ -5,11 +5,12 @@ include $(ENV_FILE)
 export
 endif
 
-GOOSE ?= go run github.com/pressly/goose/v3/cmd/goose@latest
+GOOSE_VERSION ?= v3.26.0
+GOOSE ?= go run github.com/pressly/goose/v3/cmd/goose@$(GOOSE_VERSION)
 API_DIR ?= apps/api
 MIGRATIONS_DIR ?= migrations
-DB_DRIVER ?= $(if $(GOOSE_DRIVER),$(GOOSE_DRIVER),postgres)
-DB_STRING ?= $(if $(POSTGRES_URL),$(POSTGRES_URL),$(GOOSE_DBSTRING))
+DB_DRIVER ?= $(or $(GOOSE_DRIVER),postgres)
+DB_STRING ?= $(or $(POSTGRES_URL),$(GOOSE_DBSTRING))
 MIGRATION_NAME ?= change
 API_BIN ?= /tmp/go-goals-api
 AWS_ACCOUNT_ID ?= 109684670544
@@ -21,7 +22,7 @@ BUILD_TAG ?= latest
 GIT_SHA ?= $(shell git rev-parse HEAD)
 DOCKER_PLATFORM ?= linux/amd64
 
-.PHONY: dev-api prod-api dev-web build-api test-api lint-web build-web build-image build-image-login build-image-push build-image-pull build-image-promote up down goose-install migrate-up migrate-down migrate-redo migrate-reset migrate-status migrate-version migrate-validate migrate-create prod-migrate-up prod-migrate-down prod-migrate-redo prod-migrate-reset prod-migrate-status prod-migrate-version prod-migrate-validate
+.PHONY: dev-api prod-api dev-web build-api test-api lint-web build-web build-image build-image-login build-image-push build-image-pull build-image-promote up down goose-install require-db-string migrate-up migrate-down migrate-redo migrate-reset migrate-status migrate-version migrate-validate migrate-create prod-migrate-up prod-migrate-down prod-migrate-redo prod-migrate-reset prod-migrate-status prod-migrate-version prod-migrate-validate
 
 dev-api:
 	cd $(API_DIR) && go run ./cmd/server
@@ -68,24 +69,27 @@ up: down
 	docker compose up --detach
 
 goose-install:
-	go install github.com/pressly/goose/v3/cmd/goose@latest
+	go install github.com/pressly/goose/v3/cmd/goose@$(GOOSE_VERSION)
 
-migrate-up:
+require-db-string:
+	@test -n "$(DB_STRING)" || (echo "DB_STRING is empty. Set POSTGRES_URL or GOOSE_DBSTRING before running migrations." >&2; exit 1)
+
+migrate-up: require-db-string
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" up
 
-migrate-down:
+migrate-down: require-db-string
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" down
 
-migrate-redo:
+migrate-redo: require-db-string
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" redo
 
-migrate-reset:
+migrate-reset: require-db-string
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" reset
 
-migrate-status:
+migrate-status: require-db-string
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" status
 
-migrate-version:
+migrate-version: require-db-string
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" version
 
 migrate-validate:

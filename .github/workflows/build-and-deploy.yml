@@ -37,6 +37,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       POSTGRES_URL: postgresql://postgres:password@localhost:5434/postgres?sslmode=disable
+      GOOSE_DBSTRING: postgresql://postgres:password@localhost:5434/postgres?sslmode=disable
+      GOOSE_DRIVER: postgres
     steps:
       - uses: actions/checkout@v4
 
