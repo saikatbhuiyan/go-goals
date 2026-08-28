@@ -11,6 +11,8 @@ export default function ProfilePage() {
       <ProfileWorkspace
         profileEndpoint={`${apiBaseUrl}/api/profile`}
         editEndpoint={`${apiBaseUrl}/api/profile/edit`}
+        updateEndpoint={`${apiBaseUrl}/api/aspiration-updates`}
+        deleteUpdateEndpoint={`${apiBaseUrl}/api/aspiration-updates/delete`}
       />
     </main>
   );

@@ -33,6 +33,8 @@ type ProfileResponse = {
 type ProfileWorkspaceProps = {
   profileEndpoint: string;
   editEndpoint: string;
+  updateEndpoint: string;
+  deleteUpdateEndpoint: string;
 };
 
 type FormState = {
@@ -62,13 +64,19 @@ function toFormState(profile: ProfileResponse): FormState {
 export function ProfileWorkspace({
   profileEndpoint,
   editEndpoint,
+  updateEndpoint,
+  deleteUpdateEndpoint,
 }: ProfileWorkspaceProps) {
   const [profile, setProfile] = useState<ProfileResponse | null>(null);
   const [form, setForm] = useState<FormState | null>(null);
+  const [updateContent, setUpdateContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [posting, setPosting] = useState(false);
+  const [deletingID, setDeletingID] = useState<number | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const updates = profile?.updates ?? [];
 
   const loadProfile = useCallback(async () => {
     try {
@@ -140,6 +148,68 @@ export function ProfileWorkspace({
       setError(err instanceof Error ? err.message : "Unable to save profile");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function onCreateUpdate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const content = updateContent.trim();
+    if (!content) {
+      setError("Update content cannot be empty");
+      return;
+    }
+
+    setPosting(true);
+    setMessage(null);
+    setError(null);
+
+    try {
+      const response = await fetch(updateEndpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        credentials: "include",
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Unable to publish update");
+      }
+
+      setUpdateContent("");
+      setMessage("Update published");
+      await loadProfile();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to publish update");
+    } finally {
+      setPosting(false);
+    }
+  }
+
+  async function deleteUpdate(updateID: number) {
+    setDeletingID(updateID);
+    setMessage(null);
+    setError(null);
+
+    try {
+      const response = await fetch(`${deleteUpdateEndpoint}/${updateID}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
+
+      if (!response.ok) {
+        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+        throw new Error(payload?.error ?? "Unable to delete update");
+      }
+
+      setMessage("Update deleted");
+      await loadProfile();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to delete update");
+    } finally {
+      setDeletingID(null);
     }
   }
 
@@ -225,17 +295,51 @@ export function ProfileWorkspace({
         <p className="text-sm font-medium text-sky-700">Activity</p>
         <div className="mt-4 grid grid-cols-2 gap-3">
           <Stat label="Followers" value={profile?.follower_count ?? 0} />
-          <Stat label="Updates" value={profile?.updates.length ?? 0} />
+          <Stat label="Updates" value={updates.length} />
         </div>
+        {form ? (
+          <form onSubmit={onCreateUpdate} className="mt-6 space-y-3">
+            <label className="text-sm font-medium">
+              New update
+              <textarea
+                value={updateContent}
+                onChange={(event) => setUpdateContent(event.target.value)}
+                rows={4}
+                className="mt-2 w-full rounded-md border border-zinc-300 px-3 py-2 outline-none focus:border-sky-500"
+              />
+            </label>
+            <button
+              type="submit"
+              disabled={posting}
+              className="w-full rounded-md bg-sky-700 px-4 py-2 text-sm font-medium text-white hover:bg-sky-800 disabled:opacity-60"
+            >
+              {posting ? "Publishing..." : "Publish update"}
+            </button>
+          </form>
+        ) : null}
         <div className="mt-6 space-y-3">
-          {profile?.updates.slice(0, 5).map((update) => (
-            <article key={update.id} className="rounded-lg border border-zinc-200 p-3">
-              <p className="text-sm text-zinc-700">{update.content}</p>
-              <p className="mt-2 text-xs text-zinc-500">
-                {update.like_count} likes / {update.comment_count} comments
-              </p>
-            </article>
-          ))}
+          {updates.length ? (
+            updates.slice(0, 5).map((update) => (
+              <article key={update.id} className="rounded-lg border border-zinc-200 p-3">
+                <p className="text-sm text-zinc-700">{update.content}</p>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <p className="text-xs text-zinc-500">
+                    {update.like_count} likes / {update.comment_count} comments
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void deleteUpdate(update.id)}
+                    disabled={deletingID === update.id}
+                    className="rounded-md border border-red-200 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 disabled:opacity-60"
+                  >
+                    {deletingID === update.id ? "Deleting..." : "Delete"}
+                  </button>
+                </div>
+              </article>
+            ))
+          ) : (
+            <p className="text-sm text-zinc-600">No updates yet.</p>
+          )}
         </div>
       </aside>
     </section>

@@ -486,7 +486,7 @@ func (h *Handler) fetchRecentUsers() ([]recentUser, error) {
 	}
 	defer rows.Close()
 
-	var users []recentUser
+	users := make([]recentUser, 0)
 	for rows.Next() {
 		var user recentUser
 		if err := rows.Scan(&user.ID, &user.Username, &user.DisplayName, &user.ProfileImageURL); err != nil {
@@ -527,7 +527,7 @@ func (h *Handler) fetchRecentUpdates(currentUserID int, limit int) ([]domain.Asp
 	}
 	defer rows.Close()
 
-	var updates []domain.AspirationUpdate
+	updates := make([]domain.AspirationUpdate, 0)
 	for rows.Next() {
 		var update domain.AspirationUpdate
 		if err := rows.Scan(
@@ -577,7 +577,7 @@ func (h *Handler) getComments(updateID string) ([]*domain.Comment, error) {
 		allComments = append(allComments, &comment)
 	}
 
-	var rootComments []*domain.Comment
+	rootComments := make([]*domain.Comment, 0)
 	for _, comment := range allComments {
 		if !comment.ParentID.Valid {
 			rootComments = append(rootComments, comment)

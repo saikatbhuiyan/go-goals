@@ -409,7 +409,7 @@ func (h *Handler) getProfileData(userID int, currentUserID int, page int, pageSi
 	}
 	defer rows.Close()
 
-	var updates []ProfileUpdate
+	updates := make([]ProfileUpdate, 0)
 	for rows.Next() {
 		var update domain.AspirationUpdate
 		var isOwnPost bool
@@ -451,7 +451,7 @@ func (h *Handler) getProfileData(userID int, currentUserID int, page int, pageSi
 	}
 	defer rows.Close()
 
-	var recentFollowers []RecentFollower
+	recentFollowers := make([]RecentFollower, 0)
 	for rows.Next() {
 		var follower RecentFollower
 		if err := rows.Scan(&follower.Username, &follower.ProfileImageURL); err != nil {

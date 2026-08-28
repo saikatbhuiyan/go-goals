@@ -1,19 +1,19 @@
 import { AppHeader } from "@/components/app-shell/app-header";
-import { BrowseWorkspace } from "@/components/browse/browse-workspace";
+import { UpdateDetailWorkspace } from "@/components/updates/update-detail-workspace";
 import { getApiBaseUrl } from "@/lib/api";
 
-export default function BrowsePage() {
+export default async function UpdatePage({ params }: PageProps<"/updates/[id]">) {
+  const { id } = await params;
   const apiBaseUrl = getApiBaseUrl();
 
   return (
     <main className="min-h-screen bg-stone-50 text-zinc-950">
       <AppHeader />
-      <BrowseWorkspace
-        endpoint={`${apiBaseUrl}/api/browse`}
+      <UpdateDetailWorkspace
+        endpoint={`${apiBaseUrl}/api/updates/${id}`}
+        commentEndpoint={`${apiBaseUrl}/api/comments`}
         likeEndpoint={`${apiBaseUrl}/api/like`}
         unlikeEndpoint={`${apiBaseUrl}/api/unlike`}
-        followEndpoint={`${apiBaseUrl}/api/follow`}
-        unfollowEndpoint={`${apiBaseUrl}/api/unfollow`}
       />
     </main>
   );
