@@ -75,22 +75,22 @@ require-db-string:
 	@test -n "$(DB_STRING)" || (echo "DB_STRING is empty. Set POSTGRES_URL or GOOSE_DBSTRING before running migrations." >&2; exit 1)
 
 migrate-up: require-db-string
-	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" up
+	cd $(API_DIR) && GOOSE_DRIVER="$(DB_DRIVER)" GOOSE_DBSTRING="$(DB_STRING)" $(GOOSE) -dir $(MIGRATIONS_DIR) up
 
 migrate-down: require-db-string
-	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" down
+	cd $(API_DIR) && GOOSE_DRIVER="$(DB_DRIVER)" GOOSE_DBSTRING="$(DB_STRING)" $(GOOSE) -dir $(MIGRATIONS_DIR) down
 
 migrate-redo: require-db-string
-	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" redo
+	cd $(API_DIR) && GOOSE_DRIVER="$(DB_DRIVER)" GOOSE_DBSTRING="$(DB_STRING)" $(GOOSE) -dir $(MIGRATIONS_DIR) redo
 
 migrate-reset: require-db-string
-	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" reset
+	cd $(API_DIR) && GOOSE_DRIVER="$(DB_DRIVER)" GOOSE_DBSTRING="$(DB_STRING)" $(GOOSE) -dir $(MIGRATIONS_DIR) reset
 
 migrate-status: require-db-string
-	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" status
+	cd $(API_DIR) && GOOSE_DRIVER="$(DB_DRIVER)" GOOSE_DBSTRING="$(DB_STRING)" $(GOOSE) -dir $(MIGRATIONS_DIR) status
 
 migrate-version: require-db-string
-	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(DB_STRING)" version
+	cd $(API_DIR) && GOOSE_DRIVER="$(DB_DRIVER)" GOOSE_DBSTRING="$(DB_STRING)" $(GOOSE) -dir $(MIGRATIONS_DIR) version
 
 migrate-validate:
 	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) validate
