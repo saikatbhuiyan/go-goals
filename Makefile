@@ -4,20 +4,21 @@ export
 endif
 
 GOOSE ?= go run github.com/pressly/goose/v3/cmd/goose@latest
-MIGRATIONS_DIR ?= apps/api/migrations
+API_DIR ?= apps/api
+MIGRATIONS_DIR ?= migrations
 DB_DRIVER ?= postgres
 MIGRATION_NAME ?= change
 
 .PHONY: dev-api dev-web test-api lint-web build-web goose-install migrate-up migrate-down migrate-redo migrate-reset migrate-status migrate-version migrate-create
 
 dev-api:
-	go run ./apps/api/cmd/server
+	cd $(API_DIR) && go run ./cmd/server
 
 dev-web:
 	npm --prefix apps/web run dev
 
 test-api:
-	go test ./apps/api/...
+	cd $(API_DIR) && go test ./...
 
 lint-web:
 	npm --prefix apps/web run lint
@@ -29,22 +30,22 @@ goose-install:
 	go install github.com/pressly/goose/v3/cmd/goose@latest
 
 migrate-up:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" up
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" up
 
 migrate-down:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" down
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" down
 
 migrate-redo:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" redo
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" redo
 
 migrate-reset:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" reset
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" reset
 
 migrate-status:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" status
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" status
 
 migrate-version:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" version
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) $(DB_DRIVER) "$(POSTGRES_URL)" version
 
 migrate-create:
-	$(GOOSE) -dir $(MIGRATIONS_DIR) create $(MIGRATION_NAME) sql
+	cd $(API_DIR) && $(GOOSE) -dir $(MIGRATIONS_DIR) create $(MIGRATION_NAME) sql
