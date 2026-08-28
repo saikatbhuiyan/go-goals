@@ -25,6 +25,7 @@ func (a *App) Handler() http.Handler {
 }
 
 func (a *App) registerPlatformRoutes(mux *http.ServeMux) {
+	mux.HandleFunc("/", rootHandler)
 	mux.HandleFunc("/healthz", healthHandler)
 	mux.HandleFunc("/api/health", healthHandler)
 }

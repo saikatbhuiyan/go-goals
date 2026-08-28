@@ -6,6 +6,15 @@ import (
 	"github.com/saikatbhuiyan/go-goals/internal/platform/httpx"
 )
 
+func rootHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+
+	healthHandler(w, r)
+}
+
 func healthHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
