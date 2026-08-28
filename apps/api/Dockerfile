@@ -1,22 +1,28 @@
-FROM public.ecr.aws/docker/library/golang:1.24.2-alpine
+# syntax=docker/dockerfile:1.7
 
-# Set the Current Working Directory inside the container
-WORKDIR /app
+FROM --platform=$BUILDPLATFORM golang:1.24.2-alpine AS build
 
-# Copy go mod and sum files
+WORKDIR /src
+
 COPY go.mod go.sum ./
-
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
 RUN go mod download
 
-# Copy the source from the current directory to the Working Directory inside the container
 COPY . .
 
-# Build the Go app
-RUN go build -o main ./cmd/server
+ARG TARGETOS
+ARG TARGETARCH
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-$(go env GOARCH)} go build -trimpath -ldflags="-s -w" -o /out/server ./cmd/server
 
-# Expose the port to the outside world
+FROM --platform=$BUILDPLATFORM alpine:3.21 AS certs
+RUN apk add --no-cache ca-certificates
+
+FROM scratch
+
+COPY --from=certs /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=build /out/server ./server
+
+USER 65532:65532
+
 EXPOSE 8080
 
-# Command to run the executable
-CMD ["./main"]
+CMD ["./server"]
