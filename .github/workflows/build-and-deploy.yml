@@ -1,0 +1,105 @@
+name: build-and-deploy
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+env:
+  AWS_DEFAULT_REGION: ${{ vars.AWS_DEFAULT_REGION }}
+  AWS_ACCOUNT_ID: ${{ vars.AWS_ACCOUNT_ID }}
+  API_IMAGE_REPOSITORY: ${{ vars.API_IMAGE_REPOSITORY || 'go-goals-api' }}
+  DOCKER_PLATFORM: linux/amd64
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+
+      - uses: docker/setup-buildx-action@v3
+
+      - run: make build-api
+
+      - run: make build-image BUILD_IMAGE=go-goals-api
+
+  test:
+    needs:
+      - build
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_URL: postgresql://postgres:password@localhost:5434/postgres?sslmode=disable
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/web/package-lock.json
+
+      - run: npm --prefix apps/web ci
+
+      - run: make up
+
+      - run: make migrate-validate
+
+      - run: make migrate-up
+
+      - run: make migrate-status
+
+      - run: make test-api
+
+      - run: make lint-web
+
+      - run: make build-web
+
+      - if: always()
+        run: make down
+
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    needs:
+      - test
+    runs-on: ubuntu-latest
+    concurrency:
+      group: deploy-lock
+      cancel-in-progress: false
+    env:
+      BUILD_TAG: production
+      GOOSE_DBSTRING: ${{ secrets.GOOSE_DBSTRING }}
+      GOOSE_DRIVER: ${{ vars.GOOSE_DRIVER || 'postgres' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/api/go.mod
+
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ vars.AWS_DEFAULT_REGION }}
+
+      - run: make build-image-push
+
+      - run: make migrate-validate
+
+      - run: make migrate-up
+
+      - run: make build-image-promote
