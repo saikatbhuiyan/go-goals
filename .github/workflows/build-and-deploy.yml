@@ -83,6 +83,7 @@ jobs:
       BUILD_TAG: production
       GOOSE_DBSTRING: ${{ secrets.GOOSE_DBSTRING }}
       GOOSE_DRIVER: ${{ vars.GOOSE_DRIVER || 'postgres' }}
+      RDS_SECURITY_GROUP_ID: ${{ secrets.RDS_SECURITY_GROUP_ID || vars.RDS_SECURITY_GROUP_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -102,6 +103,42 @@ jobs:
 
       - run: make migrate-validate
 
+      - name: Require RDS security group
+        run: |
+          test -n "$RDS_SECURITY_GROUP_ID" || {
+            echo "RDS_SECURITY_GROUP_ID is required so this GitHub-hosted runner can be temporarily allowed to reach PostgreSQL."
+            exit 1
+          }
+
+      - name: Capture runner public IP
+        id: runner-ip
+        run: echo "cidr=$(curl -s https://checkip.amazonaws.com)/32" >> "$GITHUB_OUTPUT"
+
+      - name: Allow runner to reach RDS
+        run: |
+          set +e
+          output=$(aws ec2 authorize-security-group-ingress \
+            --group-id "$RDS_SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 5432 \
+            --cidr "${{ steps.runner-ip.outputs.cidr }}" 2>&1)
+          status=$?
+          set -e
+
+          if [ "$status" -ne 0 ] && ! echo "$output" | grep -q "InvalidPermission.Duplicate"; then
+            echo "$output"
+            exit "$status"
+          fi
+
       - run: make migrate-up
+
+      - name: Revoke runner RDS access
+        if: always() && env.RDS_SECURITY_GROUP_ID != '' && steps.runner-ip.outputs.cidr != ''
+        run: |
+          aws ec2 revoke-security-group-ingress \
+            --group-id "$RDS_SECURITY_GROUP_ID" \
+            --protocol tcp \
+            --port 5432 \
+            --cidr "${{ steps.runner-ip.outputs.cidr }}" || true
 
       - run: make build-image-promote
